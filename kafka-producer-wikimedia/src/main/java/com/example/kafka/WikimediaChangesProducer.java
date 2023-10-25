@@ -2,17 +2,17 @@ package com.example.kafka;
 
 import com.launchdarkly.eventsource.EventHandler;
 import com.launchdarkly.eventsource.EventSource;
-import com.launchdarkly.eventsource.MessageEvent;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.net.URI;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 public class WikimediaChangesProducer {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
 
         String bootstrapServers = "localhost:9092";
         String topic = "wikimedia.recentchange";
@@ -23,35 +23,16 @@ public class WikimediaChangesProducer {
         properties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         properties.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
+        // set safe producer configs(Kafka <= 2.8) [Not required here since using kafka 3.6.0]
+//        properties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+//        properties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
+//        properties.setProperty(ProducerConfig.RETRIES_CONFIG, Integer.toString(Integer.MAX_VALUE));
+//        properties.setProperty(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "5");
+
         // Create producer
         KafkaProducer<String, String> producer = new KafkaProducer<>(properties);
 
-        EventHandler eventHandler = new EventHandler() {
-            @Override
-            public void onOpen() throws Exception {
-
-            }
-
-            @Override
-            public void onClosed() throws Exception {
-
-            }
-
-            @Override
-            public void onMessage(String event, MessageEvent messageEvent) throws Exception {
-
-            }
-
-            @Override
-            public void onComment(String comment) throws Exception {
-
-            }
-
-            @Override
-            public void onError(Throwable t) {
-
-            }
-        };
+        EventHandler eventHandler = new WikimediaChangeHandler(producer, topic);
 
         // Url to get stream of events
         String url = "https://stream.wikimedia.org/v2/stream/recentchange";
@@ -61,5 +42,8 @@ public class WikimediaChangesProducer {
 
         // Start Eventsource in separate thread
         eventSource.start();
+
+        // Produce for 10 minutes
+        TimeUnit.MINUTES.sleep(10);
     }
 }
